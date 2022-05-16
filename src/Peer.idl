@@ -1,0 +1,11 @@
+interface Peer
+{
+    void enviar_Mensaje(in string mensaje);
+    void actualizar_Lista_Peers(in string peers);
+    void updateCoor(in string coor);
+    void startElection(in string nodeId,in string id);
+    void sendOk(in string where, in string to);
+    void iWon(in string node);
+    boolean isalive();
+    string getCoordinator();
+};

@@ -97,6 +97,10 @@ public class BullyImpl extends PeerPOA {
     }
 
     //----------------------------------------------------Nuevos Métodos :D---------------------------------------------------------//
+    /*
+     * este metodo manda a llamar a todos los peers a que actualicen su textArea
+     * en donde se muestra el coordinador
+     */
     public void actualizarCoordinador(String coordinador) {
         try {
             BindingListHolder bList = new BindingListHolder();
@@ -106,38 +110,46 @@ public class BullyImpl extends PeerPOA {
                 Peer aux = PeerHelper.narrow(ncRef.resolve_str(v.binding_name[0].id));
                 aux.updateCoordinator(coordinador);
             }
-        } catch (Exception e) { //esta exepcion se puede mejorar eliminando el peer de la lista en caso de error
-            System.out.println("Error al enviar mensaje " + e);
+        } catch (Exception e) {
+            System.out.println("Error al actualizar el coordinador " + e);
             e.printStackTrace();
         }
     }
 
+    /*
+     * metodo que actualiza el textarea de las vistas con el coordinador actual
+     */
     @Override
     public void updateCoordinator(String coor) {
         coordinadorTextArea.setText(coor);
     }
 
+    /*
+     * metodo que comienza la eleccion de un nuevo coordinador 
+     * segun el algoritmo del brabucon
+     */
     @Override
     public void startElection(String idPeer) {
         electionInProgress = true;
         foundgreater = false;
-
+        // se checa si el nodo que convoca la eleccion es el actual
         if (idPeer.equals(this.idPeer)) {
-            System.out.println("Has iniciado elecciones" + idPeer);
+            System.out.println("ELECCION DE COORDINADOR POR" + idPeer);
             try {
                 BindingListHolder bList = new BindingListHolder();
                 BindingIteratorHolder bIterator = new BindingIteratorHolder();
                 ncRef.list(1000, bList, bIterator);
-
+                // se itera por todos los peers
                 for (Binding valor : bList.value) {
                     Peer aux = PeerHelper.narrow(ncRef.resolve_str(valor.binding_name[0].id));
+                    // se recuperan los ids de los peers y se dividen en sus componentes de nombre e id                    
                     String nodeId = aux.getIdPeer();
                     String[] nameAndId = nodeId.split(" ");
                     String[] thisNameAndID = idPeer.split(" ");
-                    
+                    //si se haya un peer con id mayor al actual
                     if (Integer.parseInt(nameAndId[1]) > Integer.parseInt(thisNameAndID[1])) {
                         System.out.println("Enviando solicitud de eleccion a " + aux.getIdPeer());
-                        aux.startElection(idPeer);
+                        aux.startElection(idPeer); // se convoca una eleccion a buscar un id mayor de forma recursiva
                         foundgreater = true;
                     }
                 }
@@ -145,10 +157,11 @@ public class BullyImpl extends PeerPOA {
                 Logger.getLogger(BullyPrincipal.class.getName()).log(Level.SEVERE, null, ex);
                 ex.printStackTrace();
             }
+            // el mayor de todos se declara como el ganador :)
             if (!foundgreater) {
                 iWon(this.idPeer);
             }
-        } else {
+        } else { // en caso de que no sea, manda OK a los demas
             System.out.println("Solicitud de eleccion recibida de " + idPeer);
             sendOk(this.idPeer, idPeer);
         }
@@ -156,35 +169,23 @@ public class BullyImpl extends PeerPOA {
 
     @Override
     public void sendOk(String where, String to) {
+        //se checa si no se esta enviando un OK a si mismo
         if (!idPeer.equals(to)) {
             BindingListHolder bList = new BindingListHolder();
             BindingIteratorHolder bIterator = new BindingIteratorHolder();
             ncRef.list(1000, bList, bIterator);
-
+            // se itera a todos los peers
             for (Binding valor : bList.value) {
-                NameComponent[] nombre = {valor.binding_name[0]};
-                if (valor.binding_type != BindingType.ncontext) {
-                    try {
-                        Peer aux = PeerHelper.narrow(ncRef.resolve_str(nombre[0].id));
-                        if (aux.getIdPeer().equals(to)) {
-                            System.out.println("Enviando ok a " + to);
-                            aux.sendOk(where, to);
-
-                            startElection(this.idPeer);
-                        }
-                    } catch (Exception ex) {
-
-                        try {
-                            ncRef.unbind(nombre);
-                            System.out.println("F en el chat");
-                        } catch (NotFound ex1) {
-                            ex1.printStackTrace();
-                        } catch (CannotProceed ex1) {
-                            ex1.printStackTrace();
-                        } catch (InvalidName ex1) {
-                            ex1.printStackTrace();
-                        }
+                try {
+                    Peer aux = PeerHelper.narrow(ncRef.resolve_str(valor.binding_name[0].id));
+                    // se busca encontrar el objetivo buscado y se manda el OK para iniciar una eleccion 
+                    if (aux.getIdPeer().equals(to)) {
+                        System.out.println("Enviando ok a " + to);
+                        aux.sendOk(where, to);
+                        startElection(this.idPeer);
                     }
+                } catch (Exception ex) {
+                    ex.printStackTrace();
                 }
             }
         } else {
@@ -194,21 +195,19 @@ public class BullyImpl extends PeerPOA {
 
     @Override
     public void iWon(String idPeer) {
-        //actualizarCoordinador(idPeer);
-        coordinador = idPeer;
-        electionInProgress = false;
+        coordinador = idPeer; // marcamos el peer ganador como el coordinador
+        electionInProgress = false; // se detiene la eleccion para las demas llamadas recursivas
         //actualizarCoordinador(idPeer);
 
-        if (idPeer.equals(this.idPeer)) {
+        if (idPeer.equals(this.idPeer)) { // si es el coordinador, este manda a los demas la senial de que gano
             // send win
             System.out.println("Has ganado, Notificando a los otros nodos.....");
             try {
                 BindingListHolder bList = new BindingListHolder();
                 BindingIteratorHolder bIterator = new BindingIteratorHolder();
                 ncRef.list(1000, bList, bIterator);
-                ///*Registry*/ reg = LocateRegistry.getRegistry();
+                // se itera por todos los peers y se les notifica quien gano
                 for (Binding v : bList.value) {
-                    //PeerOperations stub;//CAMBIO ------------------------
                     Peer aux = PeerHelper.narrow(ncRef.resolve_str(v.binding_name[0].id));
                     if (!aux.getIdPeer().equals(this.idPeer)) {
                         aux.iWon(idPeer);
@@ -219,20 +218,26 @@ public class BullyImpl extends PeerPOA {
                 Logger.getLogger(BullyImpl.class.getName()).log(Level.SEVERE, null, ex);
                 ex.printStackTrace();
             }
-            //stub = (PeerOperations) app.registry.lookup(v);
+            // receive win
+            System.out.println("Nodo " + idPeer + " gano la eleccion.\n");
+            //updateCoordinator(idPeer);
+            actualizarCoordinador(idPeer); // se actualiza el coordinador en los demas metodos
         }
-        // receive win
-        System.out.println("Nodo " + idPeer + " gano la eleccion.\n");
-        //updateCoordinator(idPeer);
-        actualizarCoordinador(idPeer);
-
     }
 
+    /*
+      Este metodo en si no realiza nada, si no que es necesario invocarlo de 
+      forma remota para que, en caso de no estar vivo, se arroje una excepcion
+      de corba para asi determinar que NO esta vivo el nodo
+     */
     @Override
     public boolean isalive() {
         return true;
     }
-
+    /* 
+     * retorna el coordinador del peer actual de forma remota 
+     * (necesario para integridad del algoritmo bully)
+     */
     @Override
     public String getCoordinator() {
         return coordinador;

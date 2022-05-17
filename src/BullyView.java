@@ -1,9 +1,7 @@
-
 import java.awt.event.KeyEvent;
 import java.util.Random;
 
-/**
- *
+/*
  * @author jorge
  */
 public class BullyView extends javax.swing.JFrame {

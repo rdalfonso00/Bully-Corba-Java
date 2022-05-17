@@ -54,6 +54,7 @@ public class BullyPrincipal {
             vista.setVisible(true);
             //NUEVOO--------------------------------------------------------------
             actualizarListaPeers();
+            // se inicia la eleccion de un posible nuevo coordinador
             Peer aux = PeerHelper.narrow(ncRef.resolve_str(peer.getIdPeer()));
             aux.startElection(idPeer);
             isAlive();
@@ -128,7 +129,6 @@ public class BullyPrincipal {
                 while (true) {
                     if (!peer.getIdPeer().equals(peer.getCoordinator()) && !peer.getelectionInProgress()) {
                         try {
-
                             Peer coordinador = PeerHelper.narrow(ncRef.resolve_str(peer.getCoordinator()));
                             coordinador.isalive();
                             //en caso de que el coordinador esté muerto, se arroja una excepción y se convoca a una elección

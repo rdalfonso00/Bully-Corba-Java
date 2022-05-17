@@ -142,10 +142,10 @@ public class BullyImpl extends PeerPOA {
                 // se itera por todos los peers
                 for (Binding valor : bList.value) {
                     Peer aux = PeerHelper.narrow(ncRef.resolve_str(valor.binding_name[0].id));
-                    // se recuperan los ids de los peers y se dividen en sus componentes de nombre e id                    
+                    // se recuperan los ids de los peers y se dividen en sus componentes de nombre e id  (Peer + " " + id)                  
                     String nodeId = aux.getIdPeer();
                     String[] nameAndId = nodeId.split(" ");
-                    String[] thisNameAndID = idPeer.split(" ");
+                    String[] thisNameAndID = this.idPeer.split(" ");
                     //si se haya un peer con id mayor al actual
                     if (Integer.parseInt(nameAndId[1]) > Integer.parseInt(thisNameAndID[1])) {
                         System.out.println("Enviando solicitud de eleccion a " + aux.getIdPeer());
@@ -168,24 +168,35 @@ public class BullyImpl extends PeerPOA {
     }
 
     @Override
-    public void sendOk(String where, String to) {
-        //se checa si no se esta enviando un OK a si mismo
+        public void sendOk(String where, String to) {
         if (!idPeer.equals(to)) {
             BindingListHolder bList = new BindingListHolder();
             BindingIteratorHolder bIterator = new BindingIteratorHolder();
             ncRef.list(1000, bList, bIterator);
-            // se itera a todos los peers
+
             for (Binding valor : bList.value) {
-                try {
-                    Peer aux = PeerHelper.narrow(ncRef.resolve_str(valor.binding_name[0].id));
-                    // se busca encontrar el objetivo buscado y se manda el OK para iniciar una eleccion 
-                    if (aux.getIdPeer().equals(to)) {
-                        System.out.println("Enviando ok a " + to);
-                        aux.sendOk(where, to);
-                        startElection(this.idPeer);
+                NameComponent[] nombre = {valor.binding_name[0]};
+                if (valor.binding_type != BindingType.ncontext) {
+                    try {
+                        Peer aux = PeerHelper.narrow(ncRef.resolve_str(nombre[0].id));
+                        if (aux.getIdPeer().equals(to)) {
+                            System.out.println("Enviando ok a " + to);
+                            aux.sendOk(where, to);
+
+                            startElection(this.idPeer);
+                        }
+                    } catch (Exception ex) {
+                        try {
+                            ncRef.unbind(nombre);
+                            System.out.println("F en el chat");
+                        } catch (NotFound ex1) {
+                            ex1.printStackTrace();
+                        } catch (CannotProceed ex1) {
+                            ex1.printStackTrace();
+                        } catch (InvalidName ex1) {
+                            ex1.printStackTrace();
+                        }
                     }
-                } catch (Exception ex) {
-                    ex.printStackTrace();
                 }
             }
         } else {
@@ -197,7 +208,7 @@ public class BullyImpl extends PeerPOA {
     public void iWon(String idPeer) {
         coordinador = idPeer; // marcamos el peer ganador como el coordinador
         electionInProgress = false; // se detiene la eleccion para las demas llamadas recursivas
-        //actualizarCoordinador(idPeer);
+        
 
         if (idPeer.equals(this.idPeer)) { // si es el coordinador, este manda a los demas la senial de que gano
             // send win
@@ -212,7 +223,6 @@ public class BullyImpl extends PeerPOA {
                     if (!aux.getIdPeer().equals(this.idPeer)) {
                         aux.iWon(idPeer);
                     }
-
                 }
             } catch (NotFound | CannotProceed | InvalidName ex) {
                 Logger.getLogger(BullyImpl.class.getName()).log(Level.SEVERE, null, ex);
